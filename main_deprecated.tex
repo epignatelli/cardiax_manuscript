@@ -1,0 +1,301 @@
+ \documentclass{article}
+\usepackage{arxiv}
+
+\usepackage[utf8]{inputenc}             % allow utf-8 input
+\usepackage[T1]{fontenc}                % use 8-bit T1 fonts
+\usepackage{hyperref}                   % hyperlinks
+\usepackage{url}                        % simple URL typesetting
+\usepackage{booktabs}                   % professional-quality tables
+\usepackage{amsfonts}                   % blackboard math symbols
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{nicefrac}                   % compact symbols for 1/2, etc.
+\usepackage{microtype}                  % microtypography
+\usepackage{authblk}                    % manage authors
+\usepackage{color, soul}
+\usepackage{todonotes}
+%% Bibliography management
+\usepackage[super, biblabel, nocompress, nomove]{cite}
+
+% Highlight references
+\usepackage{color, soul}
+\usepackage{xcolor}
+\definecolor{ultramarine}{RGB}{0,32,96}
+\definecolor{dblue}{RGB}{0,83,214}
+\usepackage[colorlinks=true, linkcolor=black, citecolor=dblue]{hyperref}
+
+%% Title
+\title{Rapid prediction of fibrillatory dynamics using deep recurrent residual networks}
+
+\author[1]{Eduardo Pignatelli}
+\author[1, 2]{Stef Garasto}
+\author[1]{Stathi Fotiadis}
+\author[1]{Mario Lino}
+\author[1]{Nicholas S. Peters}
+\author[1]{Anil A. Bharath}
+\author[1]{Chris D. Cantwell}
+\affil[1]{Imperial College London}
+\affil[2]{University of Greenwich}
+
+% You can use these commands to comment in the text
+\newcommand{\WIP}[1]{\textcolor{magenta}{[WIP]: #1}}
+\newcommand{\Edu}[1]{\textcolor{magenta}{<Edu>: #1}}
+\newcommand{\anil}[1]{\textcolor{orange}{<Anil>: #1}}
+\newcommand{\chris}[1]{\textcolor{teal}{<Chris>: #1}}
+\newcommand{\stathi}[1]{\textcolor{cyan}{<Stathi>: #1}}
+\newcommand{\mario}[1]{\textcolor{blue}{<Mario>: #1}}
+\newcommand{\stef}[1]{\textcolor{green}{<Stef>: #1}}
+
+%% Document
+\begin{document}
+    \maketitle
+    
+    \begin{abstract}
+    \Edu{This file is now deprecated in favour of frontiers.tex}
+    \\ \\ \\ \\ \\ 
+    Mathematical models of the propagation of cardiac action potentials (APs) are most frequently formulated as non-linear reaction-diffusion equations, specified through partial differential equations. Canonical techniques for finding numerical solutions to these equations, and thus predicting the evolution of electrical activity, include finite element and finite difference methods. However, these approaches require substantial computational resources to make predictions on clinical timescales, making patient-specific intervention planning difficult. 
+    
+    Here, we cast this problem as a spatio-temporal forecasting of discrete scalar fields and establish that narrow deep learning architectures, in the form of recurrent residual networks, can efficiently represent highly non-linear reaction-diffusion dynamics.
+    
+    We first implement a fully differentiable solver to efficiently produce \textit{in-silico} data and use it to generate a dataset using the monodomain equation, coupled with the Fenton-Karma ionic model.
+    We then design a faster, approximate solver based on a deep recurrent residual network and show it is able to learn from the \textit{in-silico} data and generate rapid approximate solutions under a range of electrophysiological conditions.
+    Finally, we explore the ability of the network to predict wavefront dynamics in the presence of a heterogeneous substrate representative of myocardial scarring.
+    We conclude by discussing a roadmap to incorporating network-based predictions of electrical activity into patient-specific modelling, as well as the open challenges that remain.
+    % Tests on data in and out of distribution for both short and long term predictions show a speed-up compared to traditional solvers by $280\times$, whilst containing the mean square error of long-term prediction to $2.2 \times 10^{-3}$.
+    % Finally, we propose a method to stabilise truncated backpropagation through time in recurrent residual networks.
+    \end{abstract}
+
+    \keywords{Reaction-diffusion systems \and Excitable media \and Partial differential equations \and Spatio-temporal forecasting \and Fenton-Karma model \and Cardiac electrophysiology \and Deep Learning \and Recurrent Residual Networks}
+
+
+    %% INTRODUCTION
+    \section{Introduction}
+    Perhaps the most significant role for computational modelling in cardiac electrophysiology is to better understand the
+    intricacies of cardiac arrhythmias. Cardiac electrical activity and motion arise from biochemical processes across a range of spatial scales, starting from ionic channel flows at the level of cardiomyocites.  Even at the channel level, conductance can be altered by channel subunits. The properties describing ionic flow also vary across the surface of the heart.\\
+    
+    Intracellular processes also play a strong role, with gap junctions providing a route for the flow of electrical charge, dominantly along fibres formed of chains of cardiomyocites, and providing conduction channels that are thought to be directional. \\
+    
+    As one moves up through spatial scales, the collective activity the underlying elements gives rise to macroscopic behaviour. But the result of the underlying complexity is that overall electrophysiological activity is highly complex. Further, the very non-linear behaviour of the underlying mechanisms means that small changes to elements of the hierarchy of processes can have profound effects on overall cardiac rhythms. \\
+    
+    A key role for computational modelling is in understanding the roles of the components of this hierarchy of physical processes. Whilst detailed modelling remains quite challenging, its potential use cases are attractive, ranging from patient-specific procedure planning to reducing the cost of developing and testing novel pharmaceutical agents \cite{Mayourian2018AnArrhythmogenicity}.\\
+    
+    In this article, we focus on a class of reaction-diffusion models that are good candidates for studying macroscopic-scale electrical behaviour in cardiac tissue. The primary intended purpose for the models we develop in this paper is rapid patient-specific modelling, but there are also applications in creating inverse models that can infer conductance maps from electrograms \cite{Martins2006EstimatingAlgorithms, Abdi2019AEstimation}. Such conductance maps may help in both the diagnostic process, and treatment options available for 
+    
+        \paragraph{Significance}
+            Challenge of simulating patient-specific models on clinical timescales. \Edu{Chris, can you chip in this last bit?}
+            
+            %Need for new approach -- machine learning / deep learning (needs a review here).
+            
+            To date, finite element, finite difference, spectral and pseudospectral methods, and their combinations, such as the spectral$/hp$ method, are mainstream to discretise these continuum models for tractable computational calculations.
+            However, in spite of their accuracy and stability in converging towards the continuum solution, the exponential complexity of these methods limits their practical applicability even to low dimensional problems, and with a considerable amount of resources.
+            
+            To scale up numerical simulations to real time rendering, we cast the problem as a learning problem, the spatio-temporal forecasting of discrete spatial fields, and draw from recent successes in deep learning for sequence to sequence modelling to solve partial differential equations (PDEs).
+            
+            It should be stressed that, despite a large quantity of evidence showing that the collective techniques of deep learning can deal very well with high-dimensional problems, the applicability of the resulting techniques to certain classes of problems that are encountered in solving inverse problems that are at the heart of a number of practical measurement and prediction problems is still limited.
+            
+            In the clinical domain, Keane\cite{Keane2018WithDiagnosis} raised awareness on the \textit{AI Chasm}, the gap between canonical accuracy metrics in machine learning and clinical efficacy.
+            We conjecture that part of the reason this gap exists is due to the limited transfer of knowledge horizontally, between historically separated domains, such as the biophysics modelling community and the machine learning one, a trend that has been reversed in the past few years.
+            
+            
+        \paragraph{Contributions}
+            Here we show that stacking deep residual networks in a recurrent fashion without truncation, i.e. performing full backpropagation through time, can efficiently represent
+            highly non-linear reaction diffusion dynamics %semi-linear parabolic PDEs, such as reaction diffusion equations
+            under isotropic heterogeneous conductivity regimes. 
+            We provide evidence that the method performs with viable accuracy, using low budget, consumer, computational resources, and achieves a speed-up of \WIP{X}\% compared to our finite difference solver. Finally, we test the limits of the network in its generalisation capacity under long term sequences.
+            To summarise, the paper provides the following contributions.
+            
+            \textit{Cardiax}, an end-to-end differentiable solver to find solutions to systems of partial differential equations using finite difference and explicit Euler time integration. The solver is developed in JAX\cite{FrostigCompilingTracing, jax2018github}, allowing for automatic differentiation of arbitrary functions and compilation for different accelerators. The main function of the solver is to allow for quick iterations of the cycle that loops data-generation and network optimisation.
+            
+            \textit{FKset}, a dataset of spatio-temporal sequences containing the 120K states of a 12.5cm $\times$ 12.5cm piece of electrically insulated cardiac tissue that obey the laws described by the Fenton-Karma equations. The simulations show a wide variety of stimuli conditions and tissue conductivity. The dataset is publicly available at \WIP{XXX}, and we hope will be useful to benchmark future research in this area.
+            
+            Finally, to the best of our knowledge, we provide the first application of deep learning to fit the Fenton-Karma equations on tissue with heterogeneous conductivity. The model assumes a low level of prior or domain knowledge. The only inductive bias we inject in the algorithm is the use of convolutional operations, underlining the spatial locality of the diffusion and reaction phenomena.
+        
+        \paragraph{Related works}
+            The research around sequence to sequence modelling and the applications of neural networks to initial value problems is tightly interleaved.
+            In fact, a consistent amount of studies explored the use of deep learning to accelerate the solution of PDEs. 
+            % A) PDEs
+            
+            Chen, Rubanova and Bettencourt \cite{Chen2018NeuralEquations} introduced a new class of neural networks - neural ordinary differential equations (NODEs) - to train continuous-depth, differentiable neural networks.
+            The core intuition is to exploit the analogy between the residual nature of a PDE initial value problem and residual networks.
+            As an effect, one can consider NODE as a residual network at the limit of infinite layers, thus, infinitely small steps, where the single step is a parametric ODE. The objective is to learn the parameters of this building block that minimise a distance metric with respect to the prediction of an oracle. One of the key contributions of this study is the use of the adjoint sensitivity method to solve the reverse mode automatic differentiation of the chain of ODE layers. This is equivalent to shifting the termination criterion from the number of layers to extinction of the gradient, signalling that the network converged to a fixed point. The major drawback of NODE is their instability in close proximity to the fixed point. Also, the pseudo-continuity of the learned function, and the limitation of homeomorphic mapping cause a lower expressivity compared to canonical neural networks.
+            
+            Bar-Sinai\cite{Bar-Sinai2019LearningEquations} proposed reducing the computational costs of solving a PDE by using proxy spatial gradients defined on a coarser grid.
+            This technique reduces the high dimensionality of the problem by learning the optimal spatial gradient representation that solves a higher dimensional problem defined on a finer grid.  
+            
+            By optimising for the resulting time derivative, the method is a generalisation of finite-difference schemes, and provides theoretical guarantees of polynomial decay of the errors in time. Despite the the improved accuracy, this data-driven discretisation was found computationally more expensive than canonical rule-based discretisations, such as standard finite differences. Results show that its applicability is limited to very low dimensional problems.
+            
+            Han\cite{Han2018SolvingLearning} reformulates PDEs as backward stochastic differential equations and approximates their gradients using a neural network.
+
+            % The propagation of waves is the focus of many studies.
+            % Maybe this is not relevant here. 
+            % We can justify the use of resnet by analogy with the residual nature of pdes and the markovian property of the problem.
+            %Sorterberg\cite{sorteberg2018approximating}. \cite{fotiadis2020comparing} . Mosley, seismic \cite{moseley2018fast}. Zuh\cite{zhu2017wave}, GAN. Stanziola\cite{??}, Helmholtz.
+            
+            % Perhaps just stanziola, which actually faced the problem of different conductivity properties , but for a boundary value problem (Helmholtz eq).
+            
+            % B) Reaction diffusion
+            Recent work employed deep learning to develop numerical models that predict specific reaction diffusion equations.
+            Li \cite{li2020reaction} proposed the use of a u-net\cite{ronneberger2015u} to learn approximate solution of the Zeldvich equation\cite{zeldovich1985mathematical}, though with low-dimensional inputs.
+            Herzog \cite{herzog2018data} combined a convolutional neural network with a linear chain of conditional random fields to represent the Bueno-Orovio-Fenton-Cherry\cite{bueno2008minimal} model. 
+            
+            % C) Sequence modelling
+        
+        \paragraph{\WIP{Outline}}
+            The paper proceeds as follows. The next section describes the ionic model subject to study, the 'three currents' Fenton-Karma model, and explains the equations we are aiming to learn. It proceeds with a formulation of the learning problem and its objectives. We discuss the algorithm in details, its setup, the optimisation details, and the evaluation procedure. Finally we present evidence that the 
+            % We first demonstrate the feasibility of our approach by fitting the model to data generated using the Fenton-Karma model, on healthy tissue, and then proceed to explore the limits of such model for clinical use. We test the model on different scenarios: a different set of physical parameters of tissue conductivity; tissue affected by fibrotic scarring.\Edu{Doesn't fibrosis entail no activity at all in the scarred tissue?}
+        
+    \section{The Fenton Karma model}
+    \begin{figure}
+        \centering
+        \includegraphics[width=10cm]{figures/fig1.png}
+        % this plot is not correct
+        \caption{An extract of the \textit{FKset} showing the three latent variables, respectively, $w$, $v$, and $u$, in three different regimes and a specific tissue conductivity. From the top: an heartbeat producing a linear wave, an arrhythmia induced by a scroll wave, fibrillation induced by chaotic activity. The results are achieved using the \textit{cardiax} solver described in section \ref{}}
+        \label{fig:Figure 1.}
+    \end{figure}
+        The canonical mathematical form that describes reaction-diffusion dynamics is a system of ordinary differential equations (ODEs):
+        \begin{equation}
+            \frac{\partial \mathbf{u}(\mathbf{x}, t)}{\partial t} = D\nabla^2 \mathbf{u} + f(\mathbf{u, t})
+        \end{equation}
+        where $\mathbf{u} = \mathbf{u}(\mathbf{x}, t) \in \mathbb{R}^m$ is a vector-valued function representing the density of an observable variable at position $\mathbf{x} \in \mathbb{R}^n$ and time t.
+        % Note that each component of u can be described by codependent pdes, effectively turning the equation above into a system of pdes.]
+        The diffusion term $D\nabla^2\mathbf{u}$ is responsible for the diffusion dynamics; $\nabla^2$ is the Laplace operator, and $D$ is a diagonal matrix of diffusion coefficients.
+        The reaction term, $f(\mathbf{u}, t)$, is a differentiable mapping $f: \mathbb{R}^m \rightarrow \mathbb{R}^m$ that describes an endergonic reaction activated by a suprathreshold production of $\mathbf{u}$.
+        
+        To characterise the electrophysiological behaviour of cardiac tissue, we consider the Fenton-Karma\cite{fenton1998vortex} monodomain continuum model. The dynamics of the transmembrane potential $V_m$ are governed by the following ODE:
+        \begin{equation}
+            \frac{\partial V(\mathbf{x}, t)}{\partial t} = \nabla \cdot (D \nabla V(\mathbf{x},  t)) - {(I_{fi}(V, v) + I_{so}(V) + I_{si}(V, w))} / {C_m}
+        \end{equation}
+        The first addend $\nabla \cdot (D \nabla V(\mathbf{x},  t))$ described the diffusion of the action potential at time $t$ and the second addend $I_{ion} = I_{fi} + I_{so} + I_{si}$ is the transmembrane current per unit capacitance $C_m$, responsible for the reaction dynamics.
+        
+        For readability, numerical implementation and comparison with other models, it is often convenient to refer to the dimensionless form of the Fenton-Karma equation.
+        The state of the discretised tissue is described by the triple of unobservable variables $\langle u, v, w \rangle$, defining $V = u(V_{fi} -V_0) + V_0$, and the equivalent scaled currents $\langle J_{fi}, J_{so}, J_{si} \rangle$, defining $J_k = I_k / (C_m(V_{k} - V_0))$.
+        We can now describe the dynamics of action potential restitution with a system of PDEs that govern the codependent interaction between the three latent variables, and the three scaled currents:
+        \begin{equation}
+            \frac{\partial u}{\partial t} = \nabla \cdot (D \nabla u) - {J_{fi}(u , v) - J_{so}(u) - J_{si}(u, w)}
+        \end{equation}  
+        \begin{equation}
+            \frac{\partial v}{\partial t} = \mathcal{H}(u_c - u)(1-v)/\tau_v^-(u) - \mathcal{H}(u-u_c)v/\tau_v^+
+        \end{equation}  
+        \begin{equation}
+            \frac{\partial w}{\partial t} = \mathcal{H}(u_c - u)(1-w)/\tau_w^- - \mathcal{H}(u-u_c)w/\tau_w^+
+        \end{equation}          
+        \begin{equation}
+            J_{fi}(V, v) = - \mathcal{H}(u-u_c)(1-u)(u-u_c) (v/\tau_d)
+        \end{equation}   
+        \begin{equation}
+            J_{so}(V) = \mathcal{H}(u_c-u)(u/\tau_0) + \mathcal{H}(u-u_c)(1/\tau_r)
+        \end{equation}
+        \begin{equation}
+            J_{si}(V, w) = -w/(2\tau_{si}) (1+ \text{tanh}(k(u-u_c^{si})))
+        \end{equation}
+        
+        $\mathcal{H}$ is the Heaviside step function; different sets of physical parameters $\langle u_c, \tau_v^-, \tau_v^+, \tau_w^-, \tau_w^+, \tau_d, \tau_0, \tau_r, \tau_{si}, k, u_c^{si} \rangle$ are selected to fit \emph{in-vivo} experimental settings and describe different regimes of conductivity of action potential.
+        Fenton\cite{Fenton2002} provides a detailed list of 13 parameter sets and a careful analysis of the AP dynamics for each case.
+        
+        Among the variety of electrical models in the cardiac domain, the Fenton-Karma shows a good balance between physiological fidelity and mathematical simplicity with three spatially-defined latent variables.
+        We conjecture the pareto-optimality of such model with respect to the two parameters above, and reagard it as the most favourable candidate to study how deep learning can scale numerical simulations to real time interactions.
+        % For these reasons, the Fenton-Karma model is most favourable candidate for our experiments.
+        For visual inspection and to develop an intuition about the expressivity of the model, Figure \ref{fig:Figure 1.} shows the action potential in three different regimes. %a linear wave, a scroll wave, and a pseudo-chaotic state.
+        
+        
+    \section{\WIP{Methods}}
+        
+        \paragraph{Problem formulation}
+            % \Edu{We need to stress more the lack of inductive bias we inject in the algorithm. The only prior is spatial locality, whereas the long term time dynamics are captured by the latent variables, which we explicitly fit to the fk variables. This also justifies the lack of unconstrained hidden states and the rejection of hidden-state-based recurrent modules such as lstms. This is also supported by the deterministic and markovian properties of the problem.}
+            Consider the iterated function $G: \mathbb{R}^{m \times n}  \rightarrow \mathbb{R}^{m \times n}$ that maps the state of the variable $\mathbf{u}$ at time $t$ to an arbitrary time $t + n$:
+        
+            \begin{equation}
+                \mathbf{u}_{t+n} = G^n(\mathbf{u}_{t})
+            \end{equation}
+            where $G^n(\cdot)$ is the Bürmann notation for the $n$-th iterate of the function G, obtained by composing the function $G$ with itself $n$ times. We represent the mapping $G(\cdot)$ with a deep residual network composed by stacking 3D convolutions blocks $f: \mathbb{R}^{c \times d \times w \times h} \rightarrow \mathbb{R}^{F \times d \times w \times h}$ that preserve the initial dimension:
+            % \begin{equation}
+            %     f(\mathbf{u}, k) = \sigma \left[T_k (\mathbf{u}) + B_k \right]
+            % \end{equation}
+            \begin{equation}
+                G(\mathbf{\theta}, \mathbf{u}_{t+1}) = \prod_{k=1}^{d}{\sigma(T_k \mathbf{u}_{(t)}) + \mathbf{u}_{(t)}}
+            \end{equation}
+            
+            Where $\mathbf{\theta}$ is a vector of function parameters; $d$ is the number of convolutional transformations, and $T_k$ is the Toepliz matrix associated to the k-th convolution.
+            
+            We aim at finding the set of parameters $\theta^*$ that minimises the utility function $J: \mathbb{R}^{m \times n} \rightarrow \mathbb{R}$:
+            \begin{equation}
+                J = \mathbb{E}[\lVert \nabla \hat{y} - \nabla y \lVert_2] + \mathbb{E}[\lVert \nabla \hat{y} - \nabla y \lVert_2]
+            \end{equation}
+        
+        
+        \paragraph{Data generation}
+            In designing the data, we focus on a piece of insulated tissue, assuming zero flow of current inside the model. We, thus, apply Neumann boundary conditions, imposing $D \partial u/ \partial t = 0$.
+        
+        \paragraph{Preprocessing}
+        Normalisation does not help, since the dynamics of u depend on the absolute value of the currents transiting the tissue. To ensure that the conductivity multiplying by 1000 to allow all the inputs have the same order of magnitude. 
+        \paragraph{Model architecture}
+        - describe the model architecture
+        
+        \paragraph{Optimisation details}
+        - optimiser, btt, curriculum learning
+        
+        \paragraph{Evaluation procedure}
+        - describe how we evaluated the model
+        
+        \paragraph{Reproducibility and code availability}
+        We aim to help reducing the current methodological crisis cause by the scarce or impossible reproducibility of results. 
+        % add code availability and instructions to reproduce the research
+        
+    
+    \section{\WIP{Experiments}}
+        \subsection{Healthy tissue}% (homogeneous conductivity)}
+            \paragraph{Experimental settings}
+            \paragraph{Results}
+        \subsection{Fibrotic scarring}% (etherogeneous conductivity(}
+            \paragraph{Experimental settings}
+            \paragraph{Results}
+        \subsection{Generalisation to different parameters set}
+            \paragraph{Experimental settings}
+            \paragraph{Results}
+        \subsection{Generalisation to longer sequences}
+            \paragraph{Experimental settings}
+            \paragraph{Results}
+
+    \begin{itemize}
+        \item Dataset generation (Parameter sets 5 and 2); describe initial conditions, all homogenous so far. 
+        \item Need to introduce scar tissue and generate simulations. Run for smaller portions of time, more simulations per parameter set. 100 simulations of around 200 frames. Initialise at different conditions.
+        \item Run simulation for long enough to get into complex regime, and then grab frames from there.
+    \end{itemize}
+    \section{Results}
+    \begin{itemize}
+        \item Start with scar free demonstrations of proof of principle. Provide qualitative observations to begin with.
+        \item if we can apply the spectral measure to quantify behaviours to compare original simulations with predicted behaviour (forget about MSE for this!, do so and include
+        \item There are two parameter sets used for training and one for testing. What about sequences from the SAME PARAMETER SETS, but different realisations?
+        \item Conclusions of this section may be that i) long time prediction in scar free case appears feasible ii) network-based predictions are both plausible and faster and iii) networks are parameter-set specific for the moment.
+    \end{itemize}
+    \subsection{Presence of scar}
+    \begin{itemize}
+        \item Is training more difficult?
+        \item There are two parameter sets used for training and one for testing. What about sequences from the SAME PARAMETER SETS, but different realisations?
+        \item Other conclusions will depend on how training works
+    \end{itemize}
+    \subsection{tbtt vs btt}
+    \subsection{depth}
+    \section{Discussion}
+    \begin{itemize}
+        \item Great care has to be taken in sampling the the distribution of sequences that are used as training examples. We found that biases in the distribution of examples with respect to spatial or temporal distributions of the wavefront locations. For example, if one samples sequences with a uniform sampling, the chance of capturing sequences close to an important observation of initial conditions is very small.
+        \item Generating data for training took around 70 hours, and 90s per sequence. Prediction takes around xx seconds.
+    \end{itemize}
+    % References
+    \bibliographystyle{unsrt}
+    \bibliography{mendeley, references}
+    
+    \section{Acknowledgements}
+    E.P., C.D.C, A.A.B, S.G and N.S.P are funded by the RoseTrees Trust grant n.577.
+    
+    \section{Author contributions}
+    
+    \section{Competing interests}
+    The authors declare no competing interests.
+    
+    \section{Additional information}\label{sup}
+        \textbf{Supplementary material} is available for this paper at X.
+        
+        \textbf{Correspondence} and request for materials should be addressed to E.P, A.A.B or C.D.C. % or (chip in, should you want to answer)
+    
+\end{document}
